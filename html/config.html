@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="config.js"></script>
+        <title>Crucible item configurator</title>
+<script>
+window.addEventListener('load', go);
+
+function go() {
+    const form = document.getElementById('config');
+    window.ITEMS.forEach((item, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        option.appendChild(document.createTextNode(item.Name));
+        form.item.appendChild(option);
+    });
+    form.item.addEventListener('change', () => {
+        const item = window.ITEMS[form.item.value];
+        while (form.prefix.firstChild) {
+            form.prefix.removeChild(form.prefix.firstChild);
+        }
+        while (form.suffix.firstChild) {
+            form.suffix.removeChild(form.suffix.firstChild);
+        }
+        [form.prefix, form.suffix].forEach(select => {
+            const none = document.createElement('option');
+            none.value = -1;
+            none.appendChild(document.createTextNode('---'));
+            select.appendChild(none);
+        });
+        window.PREFIXES.forEach((prefix, idx) => {
+            if (prefix.ItemType & item.Flags) {
+                const option = document.createElement('option');
+                option.value = idx;
+                option.appendChild(document.createTextNode(prefix.Name));
+                form.prefix.appendChild(option);
+            }
+        });
+        window.SUFFIXES.forEach((suffix, idx) => {
+            if (suffix.ItemType & item.Flags) {
+                const option = document.createElement('option');
+                option.value = idx;
+                option.appendChild(document.createTextNode(suffix.Name));
+                form.suffix.appendChild(option);
+            }
+        });
+
+        computeVal();
+    });
+    function computeVal() {
+        const item = window.ITEMS[form.item.value];
+        const prefix = form.prefix.value == -1 ? null : window.PREFIXES[form.prefix.value];
+        const suffix = form.suffix.value == -1 ? null : window.SUFFIXES[form.suffix.value];
+        let prefixVal = prefix === null ? 0 : prefix.MinParam;
+        if (prefix === null || prefix.MinParam == prefix.MaxParam) {
+            form.prefixVal.style.display = 'none';
+        } else {
+            form.prefixVal.style.display = '';
+            form.prefixVal.min = prefix.MinParam;
+            form.prefixVal.max = prefix.MaxParam;
+            prefixVal = form.prefixVal.value;
+        }
+        let suffixVal = suffix === null ? 0 : suffix.MinParam;
+        if (suffix === null || suffix.MinParam == suffix.MaxParam) {
+            form.suffixVal.style.display = 'none';
+        } else {
+            form.suffixVal.style.display = '';
+            form.suffixVal.min = suffix.MinParam;
+            form.suffixVal.max = suffix.MaxParam;
+            suffixVal = form.suffixVal.value;
+        }
+
+        let value = item.Value;
+        let mul = 1;
+        if (prefix !== null && suffix != null) {
+            mul = prefix.ValueMultiplier + suffix.ValueMultiplier;
+        } else if (prefix !== null) {
+            mul = prefix.ValueMultiplier;
+        } else if (suffix !== null) {
+            mul = suffix.ValueMultiplier;
+        }
+        value *= mul;
+        if (prefix !== null) {
+            if (prefix.MinValue == prefix.MaxValue || prefix.MinParam == prefix.MaxParam) {
+                value += prefix.MinValue;
+            } else {
+                value += prefix.MinValue + (prefix.MaxValue - prefix.MinValue) * (prefixVal - prefix.MinParam) / (prefix.MaxParam - prefix.MinParam);
+            }
+        }
+        if (suffix !== null) {
+            if (suffix.MinValue == suffix.MaxValue || suffix.MinParam == suffix.MaxParam) {
+                value += suffix.MinValue;
+            } else {
+                value += suffix.MinValue + (suffix.MaxValue - suffix.MinValue) * (suffixVal - suffix.MinParam) / (suffix.MaxParam - suffix.MinParam);
+            }
+        }
+        document.getElementById('value').innerText = value;
+
+        document.getElementById('prefixText').innerText = document.getElementById('suffixText').innerText = '';
+        if (prefix !== null) {
+            const text = prefix.Descriptions[prefixVal - prefix.MinParam];
+            document.getElementById('prefixText').innerText = text;
+        }
+        if (suffix !== null) {
+            const text = suffix.Descriptions[suffixVal - suffix.MinParam];
+            document.getElementById('suffixText').innerText = text;
+        }
+    }
+    form.addEventListener('input', computeVal);
+}
+</script>
+    </head>
+    <body>
+        <form id="config" autcomplete="off" onsubmit="return false;" style="margin-bottom: 20px">
+            <table>
+                <tr valign="top">
+                    <td>
+                        <select name="prefix">
+                            <option value="-1">---</option>
+                        </select><br>
+                        <input type="range" name="prefixVal" style="display:none">
+                    </td>
+                    <td>
+                        <select name="item"></select>
+                    </td>
+                    <td>
+                        of
+                        <select name="suffix">
+                            <option value="-1">---</option>
+                        </select><br>
+                        <input type="range" name="suffixVal" style="display:none">
+                    </td>
+                </tr>
+            </table>
+        </form>
+        <div id="value"></div>
+        <div id="prefixText"></div>
+        <div id="suffixText"></div>
+    </body>
+</html>

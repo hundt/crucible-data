@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+    <meta charset="UTF-8">
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+        <script src="config.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" rel="stylesheet">
+        <title>Crucible items</title>
+<script>
+window.addEventListener('load', go);
+
+function go() {
+    const searchForm = document.getElementById('search');
+    const modForm = document.getElementById('mod');
+
+    ITEMS.forEach((item, idx) => item.ID = idx);
+    
+    const data = window.ITEMS;
+
+    const container = document.getElementById('spreadsheet');
+    const hot = new Handsontable(container, {
+        readOnly: true,
+        readOnlyCellClassName: '',
+        data: data,
+        colHeaders: [
+            'Name',
+            'Short',
+            'Location',
+            'Damage',
+            'AC',
+            'Str',
+            'Dex',
+            'Mag',
+            'Dur',
+            'Cost',
+            'Effects'
+        ],
+        columns: [
+            {data: 'Name'},
+            {data: 'ShortName'},
+            {data: 'Loc'},
+            {data: 'Damage'},
+            {data: 'Armor'},
+            {data: 'Strength'},
+            {data: 'Dexterity'},
+            {data: 'Magic'},
+            {data: 'Durability'},
+            {
+                data: 'ID',
+                renderer: renderCost,
+            },
+            {
+                data: 'ID',
+                renderer: renderEffects,
+            },
+        ],
+        columnSorting: true,
+        filters: true,
+        licenseKey: 'non-commercial-and-evaluation',
+    });
+
+    searchForm.addEventListener('input', () => {
+        const filters = hot.getPlugin('filters');
+        filters.removeConditions(0);
+        filters.addCondition(0, 'contains', [searchForm.query.value], 'disjunction');
+        filters.filter();
+    });
+
+    window.PREFIXES.forEach((prefix, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        option.appendChild(document.createTextNode(prefix.Name));
+        modForm.prefix.appendChild(option);
+    });
+    window.SUFFIXES.forEach((suffix, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        option.appendChild(document.createTextNode(suffix.Name));
+        modForm.suffix.appendChild(option);
+    });
+
+    function showSliders() {
+        const prefix = modForm.prefix.value == -1 ? null : window.PREFIXES[modForm.prefix.value];
+        const suffix = modForm.suffix.value == -1 ? null : window.SUFFIXES[modForm.suffix.value];
+        if (prefix === null || prefix.MinParam == prefix.MaxParam) {
+            modForm.prefixVal.style.display = 'none';
+        } else {
+            modForm.prefixVal.style.display = '';
+            modForm.prefixVal.min = prefix.MinParam;
+            modForm.prefixVal.max = prefix.MaxParam;
+        }
+        if (suffix === null || suffix.MinParam == suffix.MaxParam) {
+            modForm.suffixVal.style.display = 'none';
+        } else {
+            modForm.suffixVal.style.display = '';
+            modForm.suffixVal.min = suffix.MinParam;
+            modForm.suffixVal.max = suffix.MaxParam;
+        }
+    }
+    modForm.addEventListener('input', () =>{
+        showSliders();
+        hot.render();
+    });
+    modForm.resetButton.addEventListener('click', () => {
+        modForm.reset();
+        showSliders();
+        hot.render();
+    })
+
+    function renderCost(instance, td, row, col, prop, val, cellProperties) {
+        while (td.firstChild) {
+            td.removeChild(td.firstChild);
+        }
+
+        const item = window.ITEMS[val];
+        const prefix = modForm.prefix.value == -1 ? null : window.PREFIXES[modForm.prefix.value];
+        let impossible = false;
+        if (prefix != null && !(prefix.ItemType & item.Flags)) {
+            impossible = true;
+        }
+        const suffix = modForm.suffix.value == -1 ? null : window.SUFFIXES[modForm.suffix.value];
+        if (suffix != null && !(suffix.ItemType & item.Flags)) {
+            impossible = true;
+        }
+
+        if (impossible) {
+            return;
+        }
+
+        let prefixVal = prefix === null ? 0 : prefix.MinParam;
+        if (prefix !== null && prefix.MinParam != prefix.MaxParam) {
+            prefixVal = modForm.prefixVal.value;
+        }
+        let suffixVal = suffix === null ? 0 : suffix.MinParam;
+        if (suffix !== null && suffix.MinParam != suffix.MaxParam) {
+            suffixVal = modForm.suffixVal.value;
+        }
+
+        let value = item.Value;
+        let mul = 1;
+        if (prefix !== null && suffix != null) {
+            mul = prefix.ValueMultiplier + suffix.ValueMultiplier;
+        } else if (prefix !== null) {
+            mul = prefix.ValueMultiplier;
+        } else if (suffix !== null) {
+            mul = suffix.ValueMultiplier;
+        }
+        value *= mul;
+        if (prefix !== null) {
+            if (prefix.MinValue == prefix.MaxValue || prefix.MinParam == prefix.MaxParam) {
+                value += prefix.MinValue;
+            } else {
+                value += prefix.MinValue + Math.floor((prefix.MaxValue - prefix.MinValue) * (prefixVal - prefix.MinParam) / (prefix.MaxParam - prefix.MinParam));
+            }
+        }
+        if (suffix !== null) {
+            if (suffix.MinValue == suffix.MaxValue || suffix.MinParam == suffix.MaxParam) {
+                value += suffix.MinValue;
+            } else {
+                value += suffix.MinValue + Math.floor((suffix.MaxValue - suffix.MinValue) * (suffixVal - suffix.MinParam) / (suffix.MaxParam - suffix.MinParam));
+            }
+        }
+        td.appendChild(document.createTextNode(value + ' €'));
+    }
+
+    function renderEffects(instance, td, row, col, prop, val, cellProperties) {
+        while (td.firstChild) {
+            td.removeChild(td.firstChild);
+        }
+
+        const item = window.ITEMS[val];
+        const prefix = modForm.prefix.value == -1 ? null : window.PREFIXES[modForm.prefix.value];
+        let impossible = false;
+        if (prefix != null && !(prefix.ItemType & item.Flags)) {
+            impossible = true;
+        }
+        const suffix = modForm.suffix.value == -1 ? null : window.SUFFIXES[modForm.suffix.value];
+        if (suffix != null && !(suffix.ItemType & item.Flags)) {
+            impossible = true;
+        }
+
+        if (impossible) {
+            td.innerHTML = '<i>impossible</i>'
+            return;
+        }
+
+        let prefixVal = prefix === null ? 0 : prefix.MinParam;
+        if (prefix !== null && prefix.MinParam != prefix.MaxParam) {
+            prefixVal = modForm.prefixVal.value;
+        }
+        let suffixVal = suffix === null ? 0 : suffix.MinParam;
+        if (suffix !== null && suffix.MinParam != suffix.MaxParam) {
+            suffixVal = modForm.suffixVal.value;
+        }
+
+        let value = item.Value;
+        let mul = 1;
+        if (prefix !== null && suffix != null) {
+            mul = prefix.ValueMultiplier + suffix.ValueMultiplier;
+        } else if (prefix !== null) {
+            mul = prefix.ValueMultiplier;
+        } else if (suffix !== null) {
+            mul = suffix.ValueMultiplier;
+        }
+        value *= mul;
+        if (prefix !== null) {
+            if (prefix.MinValue == prefix.MaxValue || prefix.MinParam == prefix.MaxParam) {
+                value += prefix.MinValue;
+            } else {
+                value += prefix.MinValue + (prefix.MaxValue - prefix.MinValue) * (prefixVal - prefix.MinParam) / (prefix.MaxParam - prefix.MinParam);
+            }
+        }
+        if (suffix !== null) {
+            if (suffix.MinValue == suffix.MaxValue || suffix.MinParam == suffix.MaxParam) {
+                value += suffix.MinValue;
+            } else {
+                value += suffix.MinValue + (suffix.MaxValue - suffix.MinValue) * (suffixVal - suffix.MinParam) / (suffix.MaxParam - suffix.MinParam);
+            }
+        }
+
+        if (prefix !== null) {
+            const text = prefix.Descriptions[prefixVal - prefix.MinParam];
+            const prefixText = document.createElement('div');
+            prefixText.innerText = text;
+            td.appendChild(prefixText);
+        }
+        if (suffix !== null) {
+            const text = suffix.Descriptions[suffixVal - suffix.MinParam];
+            const suffixText = document.createElement('div');
+            suffixText.innerText = text;
+            td.appendChild(suffixText);
+        }
+    }
+}
+</script>
+    </head>
+    <body>
+        <form id="mod" autcomplete="off" onsubmit="return false;" style="margin-bottom: 20px">
+            <table>
+                <tr valign="top">
+                    <td>
+                        Mods:
+                    </td>
+                    <td>
+                        <select name="prefix">
+                            <option value="-1">---</option>
+                        </select><br>
+                        <input type="range" name="prefixVal" style="display:none">
+                    </td>
+                    <td>
+                        *
+                    </td>
+                    <td>
+                        of
+                        <select name="suffix">
+                            <option value="-1">---</option>
+                        </select><br>
+                        <input type="range" name="suffixVal" style="display:none">
+                    </td>
+                    <td><input type="button" value="Reset" name="resetButton"></td>
+                </tr>
+            </table>
+        </form>
+        <form id="search" autcomplete="off" onsubmit="return false;" style="margin-bottom: 20px">
+            <input autocomplete="false" name="hidden" type="text" style="display:none;">
+            Filter names: <input autcomplete="off" name="query" type="search">
+        </form>
+        <div id="spreadsheet"></div>
+    </body>
+</html>
