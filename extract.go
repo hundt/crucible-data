@@ -681,7 +681,7 @@ func main() {
 			Type:   ItemData,
 			Offset: offset,
 		}
-		if item.Get("iLoc").(byte) == 0 {
+		if item.Get("iLoc").(byte) == 0 || item.Get("iRnd").(uint32) == 0 {
 			continue
 		}
 		minArmor := item.Get("iMinAC").(uint32)
