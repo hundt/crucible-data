@@ -13,7 +13,12 @@ function go() {
     const searchForm = document.getElementById('search');
     const modForm = document.getElementById('mod');
 
-    ITEMS.forEach((item, idx) => item.ID = idx);
+    ITEMS.forEach((item, idx) => {
+        item.ID = idx;
+        if (item.Name.indexOf(item.ShortName) == -1) {
+            item.Name += ' | ' + item.ShortName + ''
+        }
+    });
     
     const data = window.ITEMS;
 
@@ -36,7 +41,10 @@ function go() {
             'Effects'
         ],
         columns: [
-            {data: 'Name'},
+            {
+                data: 'Name',
+                renderer: renderName,
+            },
             {data: 'ShortName'},
             {data: 'Loc'},
             {data: 'Damage'},
@@ -105,7 +113,15 @@ function go() {
         modForm.reset();
         showSliders();
         hot.render();
-    })
+    });
+
+    function renderName(instance, td, row, col, prop, val, cellProperties) {
+        const idx = val.indexOf('|')
+        if (idx != -1) {
+            val = val.substring(0, idx);
+        }
+        td.innerText = val;
+    }
 
     function renderCost(instance, td, row, col, prop, val, cellProperties) {
         while (td.firstChild) {
