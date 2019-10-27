@@ -710,6 +710,7 @@ func main() {
 			"ShortName":  item.Get("iSName"),
 			"Strength":   item.Get("iMinStr"),
 			"Value":      item.Get("iValue"),
+			"Icon":       item.Get("iCurs"),
 		}
 		buf, err := json.Marshal(data)
 		if err != nil {

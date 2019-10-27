@@ -6,6 +6,13 @@
         <script src="config.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" rel="stylesheet">
         <title>Crucible items</title>
+<style>
+.icon {
+    text-align: center;
+    width: 56px;
+    /* max-width: 32px; */
+}
+</style>
 <script>
 window.addEventListener('load', go);
 
@@ -28,6 +35,7 @@ function go() {
         readOnlyCellClassName: '',
         data: data,
         colHeaders: [
+            '',
             'Name',
             'Short',
             'Location',
@@ -41,6 +49,10 @@ function go() {
             'Effects'
         ],
         columns: [
+            {
+                data: 'Icon',
+                renderer: renderIcon,
+            },
             {
                 data: 'Name',
                 renderer: renderName,
@@ -69,8 +81,8 @@ function go() {
 
     searchForm.addEventListener('input', () => {
         const filters = hot.getPlugin('filters');
-        filters.removeConditions(0);
-        filters.addCondition(0, 'contains', [searchForm.query.value], 'disjunction');
+        filters.removeConditions(1);
+        filters.addCondition(1, 'contains', [searchForm.query.value], 'disjunction');
         filters.filter();
     });
 
@@ -121,6 +133,17 @@ function go() {
             val = val.substring(0, idx);
         }
         td.innerText = val;
+    }
+
+    function renderIcon(instance, td, row, col, prop, val, cellProperties) {
+        while (td.firstChild) {
+            td.removeChild(td.firstChild);
+        }
+        const iconNum = (val == 168 ? 6 : val) + 11;
+        const img = document.createElement('img');
+        img.src = 'objcurs/' + iconNum + '.png';
+        td.className = 'icon';
+        td.appendChild(img);
     }
 
     function renderCost(instance, td, row, col, prop, val, cellProperties) {
