@@ -6,6 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/mewkiz/pkg/imgutil"
+	"github.com/sanctuary/formats/image/cel"
 )
 
 type Item struct {
@@ -524,12 +531,14 @@ func DescribePower(power *StructVal, r int, pLevel int) string {
 // const ITEM_START uint32 = 0x91180
 
 const (
-	ITEM_START   uint32 = 0x8efa8
-	ITEM_END     uint32 = 0x91df8
-	PREFIX_START uint32 = 0x7b688
-	PREFIX_END   uint32 = 0x7c618
-	SUFFIX_START uint32 = 0x7c648
-	SUFFIX_END   uint32 = 0x7d818
+	ITEM_START    uint32 = 0x8efa8
+	ITEM_END      uint32 = 0x91df8
+	PREFIX_START  uint32 = 0x7b688
+	PREFIX_END    uint32 = 0x7c618
+	SUFFIX_START  uint32 = 0x7c648
+	SUFFIX_END    uint32 = 0x7d818
+	MONSTER_START uint32 = 0x977a8
+	MONSTER_END   uint32 = 0x9afa8
 	// ITEM_START uint32 = 0x91134
 	// ITEM_END          = 0x93f84
 )
@@ -599,6 +608,32 @@ func main() {
 		Bytes:      exeBytes,
 	}
 
+	// Searching code below here:
+	// monsterSize := MonsterData.Size()
+	// for offset := uint32(0); offset+monsterSize <= uint32(len(exeBytes)); offset++ {
+	// 	monster := &StructVal{
+	// 		Exe:    exe,
+	// 		Type:   MonsterData,
+	// 		Offset: offset,
+	// 	}
+	// 	if monster.Get("GraphicType").(string) == "Monsters\\Zombie\\Zombie%c.CL2" {
+	// 		log.Printf("%#x %s", offset, monster.Get("mName").(string))
+	// 	}
+	// }
+	// os.Exit(1)
+	monsterSize := MonsterData.Size()
+	// for offset := MONSTER_START; offset < MONSTER_END; offset += monsterSize {
+	// 	log.Printf("%#x", offset)
+	// 	item := &StructVal{
+	// 		Exe:    exe,
+	// 		Type:   MonsterData,
+	// 		Offset: offset,
+	// 	}
+	// 	for _, f := range *MonsterData {
+	// 		log.Printf("  %s: %v", f.Name, item.Get(f.Name))
+	// 	}
+	// }
+
 	// itemSize := ItemData.Size()
 	// for offset := ITEM_START; offset < ITEM_END; offset += itemSize {
 	// 	log.Printf("%#x", offset)
@@ -611,6 +646,116 @@ func main() {
 	// 		log.Printf("  %s: %v", f.Name, item.Get(f.Name))
 	// 	}
 	// }
+
+	// monsterSize := MonsterData.Size()
+	mpqDir := "./data/diabdat"
+	palPath := filepath.Join(mpqDir, "levels/towndata/town.pal")
+	pal, err := cel.ParsePal(palPath)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("window.MONSTERS = [")
+	id := 0
+	for offset := MONSTER_START; offset < MONSTER_END; offset += monsterSize {
+		id++
+		monster := &StructVal{
+			Exe:    exe,
+			Type:   MonsterData,
+			Offset: offset,
+		}
+		minDamage := monster.Get("mMinDamage").(uint8)
+		maxDamage := monster.Get("mMaxDamage").(uint8)
+		damage := fmt.Sprintf("%d", minDamage)
+		if minDamage != maxDamage {
+			damage = fmt.Sprintf("%d–%d", minDamage, maxDamage)
+		}
+		minDamage2 := monster.Get("mMinDamage2").(uint8)
+		maxDamage2 := monster.Get("mMaxDamage2").(uint8)
+		damage2 := fmt.Sprintf("%d", minDamage2)
+		if maxDamage2 == 0 {
+			damage2 = ""
+		}
+		if minDamage2 != maxDamage2 {
+			damage2 = fmt.Sprintf("%d–%d", minDamage2, maxDamage2)
+		}
+		minHP := monster.Get("mMinHP").(uint32)
+		maxHP := monster.Get("mMaxHP").(uint32)
+		hp := fmt.Sprintf("%d", minHP)
+		if minHP != maxHP {
+			hp = fmt.Sprintf("%d–%d", minHP, maxHP)
+		}
+		monsterClasses := map[uint8]string{
+			0: "Undead",
+			1: "Demon",
+			2: "Animal",
+		}
+		celPath := filepath.Join(mpqDir, strings.Replace(
+			strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", "a", -1)),
+			"\\", "/", -1))
+		log.Printf("decoding %s", celPath)
+		thisPal := pal
+		trnPath := monster.Get("TransFile").(string)
+		if trnPath != "" {
+			trnPath := filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
+			trn, err := cel.ParseTrn(trnPath)
+			if err != nil {
+				panic(err)
+			}
+			thisPal = trn.Pal(pal)
+		}
+		imgs, err := cel.DecodeArchive(celPath, thisPal)
+		if err != nil {
+			panic(err)
+		}
+		dstDir := fmt.Sprintf("/tmp/images/%d", id)
+		os.RemoveAll(dstDir)
+		if err := os.MkdirAll(dstDir, 0755); err != nil {
+			panic(err)
+		}
+
+		pngs := []string{}
+		for j, img := range imgs[7] {
+			pngName := fmt.Sprintf("%04d.png", j+1)
+			pngPath := filepath.Join(dstDir, pngName)
+			if err := imgutil.WriteFile(pngPath, img); err != nil {
+				panic(err)
+			}
+			pngs = append(pngs, pngPath)
+		}
+		args := []string{
+			"-delay",
+			"10",
+			"-loop",
+			"0",
+			"-dispose",
+			"previous",
+		}
+		args = append(args, pngs...)
+		args = append(args, fmt.Sprintf("html/monsters/%d.gif", id))
+		cmd := exec.Command("/usr/bin/convert", args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			panic(out)
+		}
+		data := map[string]interface{}{
+			"ID":         id,
+			"Name":       monster.Get("mName"),
+			"MinDLvl":    15*int32(int8(monster.Get("mMinDLvl").(uint8)))/30 + 1,
+			"MaxDLvl":    15*int32(int8(monster.Get("mMaxDLvl").(uint8)))/30 + 1,
+			"Damage":     damage,
+			"Damage2":    damage2,
+			"HP":         hp,
+			"Resistance": monster.Get("mMagicRes"),
+			"AC":         monster.Get("mArmorClass"),
+			"Type":       monsterClasses[monster.Get("mMonstClass").(uint8)],
+		}
+		buf, err := json.Marshal(data)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("  %s,\n", buf)
+	}
+	fmt.Println("];")
 
 	prefixSize := PowerData.Size()
 	fmt.Println("window.PREFIXES = [")
