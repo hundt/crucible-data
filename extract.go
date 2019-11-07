@@ -689,42 +689,54 @@ func main() {
 			1: "Demon",
 			2: "Animal",
 		}
-		celPath := filepath.Join(mpqDir, strings.Replace(
-			strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", "a", -1)),
-			"\\", "/", -1))
-		log.Printf("decoding %s", celPath)
-		thisPal := pal
-		trnPath := monster.Get("TransFile").(string)
-		if trnPath != "" {
-			trnPath := filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
-			trn, err := cel.ParseTrn(trnPath)
-			if err != nil {
-				panic(err)
-			}
-			thisPal = trn.Pal(pal)
-		}
-		imgs, err := cel.DecodeArchive(celPath, thisPal)
-		if err != nil {
-			panic(err)
-		}
 		dstDir := fmt.Sprintf("/tmp/images/%d", id)
 		os.RemoveAll(dstDir)
 		if err := os.MkdirAll(dstDir, 0755); err != nil {
 			panic(err)
 		}
-
 		pngs := []string{}
-		for j, img := range imgs[7] {
-			pngName := fmt.Sprintf("%04d.png", j+1)
-			pngPath := filepath.Join(dstDir, pngName)
-			if err := imgutil.WriteFile(pngPath, img); err != nil {
+		anims := "nwahds"
+		for _, animIdx := range []int{1, 2, 1, 4} {
+			animType := string(anims[animIdx])
+			if monster.Get(fmt.Sprintf("Frames[%d]", animIdx)).(uint32) <= 1 {
+				log.Printf("skipping %s for %s", animType, monster.Get("mName"))
+				continue
+			}
+			celPath := filepath.Join(mpqDir, strings.Replace(
+				strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", animType, -1)),
+				"\\", "/", -1))
+			if celPath == "data/diabdat/monsters/golem/golemd.cl2" {
+				log.Printf("skipping %s", celPath)
+				continue
+			}
+			log.Printf("decoding %s", celPath)
+			thisPal := pal
+			trnPath := monster.Get("TransFile").(string)
+			if trnPath != "" {
+				trnPath := filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
+				trn, err := cel.ParseTrn(trnPath)
+				if err != nil {
+					panic(err)
+				}
+				thisPal = trn.Pal(pal)
+			}
+			imgs, err := cel.DecodeArchive(celPath, thisPal)
+			if err != nil {
 				panic(err)
 			}
-			pngs = append(pngs, pngPath)
+
+			for _, img := range imgs[7] {
+				pngName := fmt.Sprintf("%04d.png", len(pngs)+1)
+				pngPath := filepath.Join(dstDir, pngName)
+				if err := imgutil.WriteFile(pngPath, img); err != nil {
+					panic(err)
+				}
+				pngs = append(pngs, pngPath)
+			}
 		}
 		args := []string{
 			"-delay",
-			"10",
+			"5",
 			"-loop",
 			"0",
 			"-dispose",
