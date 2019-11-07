@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+    <meta charset="UTF-8">
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+        <script src="config.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" rel="stylesheet">
+        <link href="common.css" rel="stylesheet">
+        <script src="common.js"></script>
+        <title>Crucible monsters</title>
+<style>
+.monster {
+    text-align: center;
+    width: 128px;
+}
+</style>
+<script>
+window.addEventListener('load', go);
+
+function go() {
+    const searchForm = document.getElementById('search');
+    
+    const data = window.MONSTERS;
+
+    const container = document.getElementById('spreadsheet');
+    const hot = new Handsontable(container, {
+        readOnly: true,
+        readOnlyCellClassName: '',
+        data: data,
+        colHeaders: [
+            '',
+            'Name',
+            'HP',
+            'Damage',
+            'Damage (Alt. attack)',
+            'AC',
+            'Min. dlvl.',
+            'Max. dlvl.',
+            'Type',
+            'Resists',
+        ],
+        columns: [
+            {
+                data: 'ID',
+                renderer: renderSprite,
+            },
+            {data: 'Name'},
+            {data: 'HP'},
+            {data: 'Damage'},
+            {data: 'Damage2'},
+            {data: 'AC'},
+            {data: 'MinDLvl'},
+            {data: 'MaxDLvl'},
+            {data: 'Type'},
+            {
+                data: 'Resistance',
+                renderer: renderResists,
+            },
+        ],
+        columnSorting: true,
+        filters: true,
+        licenseKey: 'non-commercial-and-evaluation',
+    });
+
+    function renderSprite(instance, td, row, col, prop, val, cellProperties) {
+        while (td.firstChild) {
+            td.removeChild(td.firstChild);
+        }
+        const img = document.createElement('img');
+        img.src = 'monsters/' + val + '.gif';
+        td.className = 'monster';
+        td.appendChild(img);
+    }
+
+    function renderResists(instance, td, row, col, prop, val, cellProperties) {
+        while (td.firstChild) {
+            td.removeChild(td.firstChild);
+        }
+        function add(str) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            td.appendChild(div);
+        }
+        if (val & 0x01) {
+            add('Resists magic');
+        }
+        if (val & 0x08) {
+            add('Immune to magic');
+        }
+        if (val & 0x02) {
+            add('Resists fire');
+        }
+        if (val & 0x10) {
+            add('Immune to fire');
+        }
+        if (val & 0x04) {
+            add('Resists lightning');
+        }
+        if (val & 0x20) {
+            add('Immune to lightning');
+        }
+        if (val & 0x40) {
+            add('???');
+        }
+        if (val & 0x80) {
+            add('Immune to acid');
+        }
+    }
+
+    searchForm.addEventListener('input', () => {
+        const filters = hot.getPlugin('filters');
+        filters.removeConditions(1);
+        filters.addCondition(1, 'contains', [searchForm.query.value], 'disjunction');
+        filters.filter();
+    });
+}
+</script>
+    </head>
+    <body>
+        <div id="header"></div>
+        <form id="search" autcomplete="off" onsubmit="return false;" style="margin-bottom: 20px">
+            <input autocomplete="false" name="hidden" type="text" style="display:none;">
+            Filter names: <input autcomplete="off" name="query" type="search">
+        </form>
+        <div id="spreadsheet"></div>
+    </body>
+</html>
