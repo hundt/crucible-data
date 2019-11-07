@@ -164,6 +164,23 @@ var MonsterData = &Struct{
 	Field{PRIMITIVE_USHORT, "mExp"},
 }
 
+var UniqueMonsterData = &Struct{
+	Field{PRIMITIVE_CHAR, "mtype"},
+	Field{PRIMITIVE_STRING, "mName"},
+	Field{PRIMITIVE_STRING, "mTrnName"},
+	Field{PRIMITIVE_UCHAR, "mlevel"},
+	Field{PRIMITIVE_USHORT, "mmaxhp"},
+	Field{PRIMITIVE_UCHAR, "mAi"},
+	Field{PRIMITIVE_UCHAR, "mint"},
+	Field{PRIMITIVE_UCHAR, "mMinDamage"},
+	Field{PRIMITIVE_UCHAR, "mMaxDamage"},
+	Field{PRIMITIVE_USHORT, "mMagicRes"},
+	Field{PRIMITIVE_USHORT, "mUnqAttr"},
+	Field{PRIMITIVE_UCHAR, "mUnqVar1"},
+	Field{PRIMITIVE_UCHAR, "mUnqVar2"},
+	Field{PRIMITIVE_INT, "mtalkmsg"},
+}
+
 func (s *Struct) Size() uint32 {
 	offs := uint32(0)
 	for _, f := range *s {

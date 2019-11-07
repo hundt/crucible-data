@@ -6,12 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
-	"github.com/mewkiz/pkg/imgutil"
 	"github.com/sanctuary/formats/image/cel"
 )
 
@@ -531,14 +527,16 @@ func DescribePower(power *StructVal, r int, pLevel int) string {
 // const ITEM_START uint32 = 0x91180
 
 const (
-	ITEM_START    uint32 = 0x8efa8
-	ITEM_END      uint32 = 0x91df8
-	PREFIX_START  uint32 = 0x7b688
-	PREFIX_END    uint32 = 0x7c618
-	SUFFIX_START  uint32 = 0x7c648
-	SUFFIX_END    uint32 = 0x7d818
-	MONSTER_START uint32 = 0x977a8
-	MONSTER_END   uint32 = 0x9afa8
+	ITEM_START           uint32 = 0x8efa8
+	ITEM_END             uint32 = 0x91df8
+	PREFIX_START         uint32 = 0x7b688
+	PREFIX_END           uint32 = 0x7c618
+	SUFFIX_START         uint32 = 0x7c648
+	SUFFIX_END           uint32 = 0x7d818
+	MONSTER_START        uint32 = 0x977a8
+	MONSTER_END          uint32 = 0x9afa8
+	UNIQUE_MONSTER_START uint32 = 0x9b098
+	UNIQUE_MONSTER_END   uint32 = 0x9bcb8
 	// ITEM_START uint32 = 0x91134
 	// ITEM_END          = 0x93f84
 )
@@ -621,7 +619,32 @@ func main() {
 	// 	}
 	// }
 	// os.Exit(1)
-	monsterSize := MonsterData.Size()
+	// uniqueMonsterSize := UniqueMonsterData.Size()
+	// for offset := uint32(0); offset+uniqueMonsterSize <= uint32(len(exeBytes)); offset++ {
+	// 	monster := &StructVal{
+	// 		Exe:    exe,
+	// 		Type:   UniqueMonsterData,
+	// 		Offset: offset,
+	// 	}
+	// 	if monster.Get("mName").(string) == "Gharbad the Weak" {
+	// 		log.Printf("%#x %s", offset, monster.Get("mName").(string))
+	// 	}
+	// }
+	// uniqueMonsterSize := UniqueMonsterData.Size()
+	// for offset := UNIQUE_MONSTER_START; offset < UNIQUE_MONSTER_END; offset += uniqueMonsterSize {
+	// 	log.Printf("%#x", offset)
+	// 	item := &StructVal{
+	// 		Exe:    exe,
+	// 		Type:   UniqueMonsterData,
+	// 		Offset: offset,
+	// 	}
+	// 	for _, f := range *UniqueMonsterData {
+	// 		log.Printf("  %s: %v", f.Name, item.Get(f.Name))
+	// 	}
+	// }
+	// os.Exit(1)
+	// os.Exit(1)
+	// monsterSize := MonsterData.Size()
 	// for offset := MONSTER_START; offset < MONSTER_END; offset += monsterSize {
 	// 	log.Printf("%#x", offset)
 	// 	item := &StructVal{
@@ -647,15 +670,23 @@ func main() {
 	// 	}
 	// }
 
-	// monsterSize := MonsterData.Size()
+	monsters := []*StructVal{}
+
+	monsterSize := MonsterData.Size()
 	mpqDir := "./data/diabdat"
 	palPath := filepath.Join(mpqDir, "levels/towndata/town.pal")
 	pal, err := cel.ParsePal(palPath)
 	if err != nil {
 		panic(err)
 	}
+	_ = pal
 	fmt.Println("window.MONSTERS = [")
 	id := 0
+	monsterClasses := map[uint8]string{
+		0: "Undead",
+		1: "Demon",
+		2: "Animal",
+	}
 	for offset := MONSTER_START; offset < MONSTER_END; offset += monsterSize {
 		id++
 		monster := &StructVal{
@@ -663,6 +694,7 @@ func main() {
 			Type:   MonsterData,
 			Offset: offset,
 		}
+		monsters = append(monsters, monster)
 		minDamage := monster.Get("mMinDamage").(uint8)
 		maxDamage := monster.Get("mMaxDamage").(uint8)
 		damage := fmt.Sprintf("%d", minDamage)
@@ -678,77 +710,72 @@ func main() {
 		if minDamage2 != maxDamage2 {
 			damage2 = fmt.Sprintf("%d–%d", minDamage2, maxDamage2)
 		}
-		minHP := monster.Get("mMinHP").(uint32)
-		maxHP := monster.Get("mMaxHP").(uint32)
+		minHP := monster.Get("mMinHP").(uint32) >> 1
+		maxHP := monster.Get("mMaxHP").(uint32) >> 1
 		hp := fmt.Sprintf("%d", minHP)
 		if minHP != maxHP {
 			hp = fmt.Sprintf("%d–%d", minHP, maxHP)
 		}
-		monsterClasses := map[uint8]string{
-			0: "Undead",
-			1: "Demon",
-			2: "Animal",
-		}
-		dstDir := fmt.Sprintf("/tmp/images/%d", id)
-		os.RemoveAll(dstDir)
-		if err := os.MkdirAll(dstDir, 0755); err != nil {
-			panic(err)
-		}
-		pngs := []string{}
-		anims := "nwahds"
-		for _, animIdx := range []int{1, 2, 1, 4} {
-			animType := string(anims[animIdx])
-			if monster.Get(fmt.Sprintf("Frames[%d]", animIdx)).(uint32) <= 1 {
-				log.Printf("skipping %s for %s", animType, monster.Get("mName"))
-				continue
-			}
-			celPath := filepath.Join(mpqDir, strings.Replace(
-				strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", animType, -1)),
-				"\\", "/", -1))
-			if celPath == "data/diabdat/monsters/golem/golemd.cl2" {
-				log.Printf("skipping %s", celPath)
-				continue
-			}
-			log.Printf("decoding %s", celPath)
-			thisPal := pal
-			trnPath := monster.Get("TransFile").(string)
-			if trnPath != "" {
-				trnPath := filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
-				trn, err := cel.ParseTrn(trnPath)
-				if err != nil {
-					panic(err)
-				}
-				thisPal = trn.Pal(pal)
-			}
-			imgs, err := cel.DecodeArchive(celPath, thisPal)
-			if err != nil {
-				panic(err)
-			}
+		// dstDir := fmt.Sprintf("/tmp/images/%d", id)
+		// os.RemoveAll(dstDir)
+		// if err := os.MkdirAll(dstDir, 0755); err != nil {
+		// 	panic(err)
+		// }
+		// pngs := []string{}
+		// anims := "nwahds"
+		// for _, animIdx := range []int{1, 2, 1, 4} {
+		// 	animType := string(anims[animIdx])
+		// 	if monster.Get(fmt.Sprintf("Frames[%d]", animIdx)).(uint32) <= 1 {
+		// 		log.Printf("skipping %s for %s", animType, monster.Get("mName"))
+		// 		continue
+		// 	}
+		// 	celPath := filepath.Join(mpqDir, strings.Replace(
+		// 		strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", animType, -1)),
+		// 		"\\", "/", -1))
+		// 	if celPath == "data/diabdat/monsters/golem/golemd.cl2" {
+		// 		log.Printf("skipping %s", celPath)
+		// 		continue
+		// 	}
+		// 	log.Printf("decoding %s", celPath)
+		// 	thisPal := pal
+		// 	trnPath := monster.Get("TransFile").(string)
+		// 	if trnPath != "" {
+		// 		trnPath := filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
+		// 		trn, err := cel.ParseTrn(trnPath)
+		// 		if err != nil {
+		// 			panic(err)
+		// 		}
+		// 		thisPal = trn.Pal(pal)
+		// 	}
+		// 	imgs, err := cel.DecodeArchive(celPath, thisPal)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
 
-			for _, img := range imgs[7] {
-				pngName := fmt.Sprintf("%04d.png", len(pngs)+1)
-				pngPath := filepath.Join(dstDir, pngName)
-				if err := imgutil.WriteFile(pngPath, img); err != nil {
-					panic(err)
-				}
-				pngs = append(pngs, pngPath)
-			}
-		}
-		args := []string{
-			"-delay",
-			"5",
-			"-loop",
-			"0",
-			"-dispose",
-			"previous",
-		}
-		args = append(args, pngs...)
-		args = append(args, fmt.Sprintf("html/monsters/%d.gif", id))
-		cmd := exec.Command("/usr/bin/convert", args...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			panic(out)
-		}
+		// 	for _, img := range imgs[7] {
+		// 		pngName := fmt.Sprintf("%04d.png", len(pngs)+1)
+		// 		pngPath := filepath.Join(dstDir, pngName)
+		// 		if err := imgutil.WriteFile(pngPath, img); err != nil {
+		// 			panic(err)
+		// 		}
+		// 		pngs = append(pngs, pngPath)
+		// 	}
+		// }
+		// args := []string{
+		// 	"-delay",
+		// 	"5",
+		// 	"-loop",
+		// 	"0",
+		// 	"-dispose",
+		// 	"previous",
+		// }
+		// args = append(args, pngs...)
+		// args = append(args, fmt.Sprintf("html/monsters/%d.gif", id))
+		// cmd := exec.Command("/usr/bin/convert", args...)
+		// out, err := cmd.CombinedOutput()
+		// if err != nil {
+		// 	panic(out)
+		// }
 		data := map[string]interface{}{
 			"ID":         id,
 			"Name":       monster.Get("mName"),
@@ -757,6 +784,7 @@ func main() {
 			"Damage":     damage,
 			"Damage2":    damage2,
 			"HP":         hp,
+			"Experience": monster.Get("mExp"),
 			"Resistance": monster.Get("mMagicRes"),
 			"AC":         monster.Get("mArmorClass"),
 			"Type":       monsterClasses[monster.Get("mMonstClass").(uint8)],
@@ -766,6 +794,118 @@ func main() {
 			panic(err)
 		}
 		fmt.Printf("  %s,\n", buf)
+	}
+	fmt.Println("];")
+
+	fmt.Println("window.UNIQUE_MONSTERS = [")
+	uniqueMonsterSize := UniqueMonsterData.Size()
+	uid := 0
+	for offset := UNIQUE_MONSTER_START; offset < UNIQUE_MONSTER_END; offset += uniqueMonsterSize {
+		uid++
+		unique := &StructVal{
+			Exe:    exe,
+			Type:   UniqueMonsterData,
+			Offset: offset,
+		}
+		monsterType := unique.Get("mtype").(uint8)
+		if monsterType == 255 {
+			continue
+		}
+		baseMonster := monsters[unique.Get("mtype").(uint8)]
+
+		minDamage := unique.Get("mMinDamage").(uint8)
+		maxDamage := unique.Get("mMaxDamage").(uint8)
+		damage := fmt.Sprintf("%d", minDamage)
+		if minDamage != maxDamage {
+			damage = fmt.Sprintf("%d–%d", minDamage, maxDamage)
+		}
+
+		hp := unique.Get("mmaxhp").(uint16) >> 1
+		if hp < 64 {
+			hp = 64
+		}
+
+		attr := unique.Get("mUnqAttr").(uint16)
+		v1 := unique.Get("mUnqVar1").(uint8)
+
+		ac := baseMonster.Get("mArmorClass").(uint8)
+		if attr&8 > 0 {
+			ac = v1
+		}
+
+		data := map[string]interface{}{
+			"ID":         uid,
+			"Name":       unique.Get("mName"),
+			"Damage":     damage,
+			"Resistance": unique.Get("mMagicRes"),
+			"HP":         hp,
+			"Experience": baseMonster.Get("mExp").(uint16) * 2,
+			"AC":         ac,
+			"Type":       monsterClasses[baseMonster.Get("mMonstClass").(uint8)],
+		}
+		buf, err := json.Marshal(data)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("  %s,\n", buf)
+
+		// dstDir := fmt.Sprintf("/tmp/images/%d", id)
+		// os.RemoveAll(dstDir)
+		// if err := os.MkdirAll(dstDir, 0755); err != nil {
+		// 	panic(err)
+		// }
+		// pngs := []string{}
+		// anims := "nwahds"
+		// for _, animIdx := range []int{1, 2, 1, 4} {
+		// 	animType := string(anims[animIdx])
+		// 	if baseMonster.Get(fmt.Sprintf("Frames[%d]", animIdx)).(uint32) <= 1 {
+		// 		log.Printf("skipping %s for %s", animType, baseMonster.Get("mName"))
+		// 		continue
+		// 	}
+		// 	celPath := filepath.Join(mpqDir, strings.Replace(
+		// 		strings.ToLower(strings.Replace(baseMonster.Get("GraphicType").(string), "%c", animType, -1)),
+		// 		"\\", "/", -1))
+		// 	if celPath == "data/diabdat/monsters/golem/golemd.cl2" {
+		// 		log.Printf("skipping %s", celPath)
+		// 		continue
+		// 	}
+		// 	log.Printf("decoding %s", celPath)
+		// 	trnPath := fmt.Sprintf("Monsters\\Monsters\\%s.TRN", unique.Get("mTrnName").(string))
+		// 	trnPath = filepath.Join(mpqDir, strings.ToLower(strings.Replace(trnPath, "\\", "/", -1)))
+		// 	trn, err := cel.ParseTrn(trnPath)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	thisPal := trn.Pal(pal)
+		// 	imgs, err := cel.DecodeArchive(celPath, thisPal)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+
+		// 	for _, img := range imgs[7] {
+		// 		pngName := fmt.Sprintf("%04d.png", len(pngs)+1)
+		// 		pngPath := filepath.Join(dstDir, pngName)
+		// 		if err := imgutil.WriteFile(pngPath, img); err != nil {
+		// 			panic(err)
+		// 		}
+		// 		pngs = append(pngs, pngPath)
+		// 	}
+		// }
+		// args := []string{
+		// 	"-delay",
+		// 	"5",
+		// 	"-loop",
+		// 	"0",
+		// 	"-dispose",
+		// 	"previous",
+		// }
+		// args = append(args, pngs...)
+		// args = append(args, fmt.Sprintf("html/unique-monsters/%d.gif", uid))
+		// cmd := exec.Command("/usr/bin/convert", args...)
+		// out, err := cmd.CombinedOutput()
+		// if err != nil {
+		// 	panic(out)
+		// }
 	}
 	fmt.Println("];")
 
