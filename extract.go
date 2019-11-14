@@ -710,8 +710,8 @@ func main() {
 		if minDamage2 != maxDamage2 {
 			damage2 = fmt.Sprintf("%d–%d", minDamage2, maxDamage2)
 		}
-		minHP := monster.Get("mMinHP").(uint32) >> 1
-		maxHP := monster.Get("mMaxHP").(uint32) >> 1
+		minHP := monster.Get("mMinHP").(uint32)
+		maxHP := monster.Get("mMaxHP").(uint32)
 		hp := fmt.Sprintf("%d", minHP)
 		if minHP != maxHP {
 			hp = fmt.Sprintf("%d–%d", minHP, maxHP)
@@ -829,7 +829,7 @@ func main() {
 			damage = fmt.Sprintf("%d–%d", minDamage, maxDamage)
 		}
 
-		hp := unique.Get("mmaxhp").(uint16) >> 1
+		hp := unique.Get("mmaxhp").(uint16)
 		if hp < 64 {
 			hp = 64
 		}
