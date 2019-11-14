@@ -796,6 +796,7 @@ func main() {
 			"Resistance": monster.Get("mMagicRes"),
 			"AC":         monster.Get("mArmorClass"),
 			"Type":       monsterClasses[monster.Get("mMonstClass").(uint8)],
+			"mLevel":     monster.Get("mLevel"),
 		}
 		buf, err := json.Marshal(data)
 		if err != nil {
@@ -841,6 +842,11 @@ func main() {
 			ac = v1
 		}
 
+		mLevel := unique.Get("mlevel").(byte)
+		if mLevel == 0 {
+			mLevel = baseMonster.Get("mLevel").(byte) + 5
+		}
+
 		data := map[string]interface{}{
 			"ID":         uid,
 			"Name":       unique.Get("mName"),
@@ -850,6 +856,7 @@ func main() {
 			"Experience": baseMonster.Get("mExp").(uint16) * 2,
 			"AC":         ac,
 			"Type":       monsterClasses[baseMonster.Get("mMonstClass").(uint8)],
+			"mLevel":     mLevel,
 		}
 		buf, err := json.Marshal(data)
 		if err != nil {
