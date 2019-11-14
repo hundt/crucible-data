@@ -23,6 +23,7 @@ function go() {
     const data = window.UNIQUE_MONSTERS;
 
     const container = document.getElementById('spreadsheet');
+    const imageCache = Object.create(null);
     const hot = new Handsontable(container, {
         readOnly: true,
         readOnlyCellClassName: '',
@@ -60,10 +61,16 @@ function go() {
         while (td.firstChild) {
             td.removeChild(td.firstChild);
         }
-        const img = document.createElement('img');
-        img.src = 'unique-monsters/' + val + '.gif';
         td.className = 'monster';
-        td.appendChild(img);
+        let div = imageCache[val];
+        if (!div) {
+            div = document.createElement('div');
+            const img = document.createElement('img');
+            img.src = 'unique-monsters/' + val + '.gif';
+            div.appendChild(img);
+            imageCache[val] = div
+        }
+        td.appendChild(div);
     }
 
     function renderResists(instance, td, row, col, prop, val, cellProperties) {
