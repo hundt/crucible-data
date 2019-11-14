@@ -723,7 +723,11 @@ func main() {
 		// }
 		// pngs := []string{}
 		// anims := "nwahds"
-		// for _, animIdx := range []int{1, 2, 1, 4} {
+		// seq := []int{1, 2, 1, 4}
+		// if monster.Get("has_special").(bool) {
+		// 	seq = []int{1, 2, 1, 5, 1, 4}
+		// }
+		// for _, animIdx := range seq {
 		// 	animType := string(anims[animIdx])
 		// 	if monster.Get(fmt.Sprintf("Frames[%d]", animIdx)).(uint32) <= 1 {
 		// 		log.Printf("skipping %s for %s", animType, monster.Get("mName"))
@@ -733,6 +737,10 @@ func main() {
 		// 		strings.ToLower(strings.Replace(monster.Get("GraphicType").(string), "%c", animType, -1)),
 		// 		"\\", "/", -1))
 		// 	if celPath == "data/diabdat/monsters/golem/golemd.cl2" {
+		// 		log.Printf("skipping %s", celPath)
+		// 		continue
+		// 	}
+		// 	if celPath == "data/diabdat/monsters/golem/golems.cl2" {
 		// 		log.Printf("skipping %s", celPath)
 		// 		continue
 		// 	}
